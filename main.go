@@ -3,7 +3,7 @@ package main
 import (
 	"flag"
 	"fmt"
-	"github.com/adolsalamanca/consul-kv/api"
+	"github.com/adolsalamanca/consul-go-poc/api"
 	consul "github.com/hashicorp/consul/api"
 	"github.com/labstack/echo/v4"
 	"github.com/labstack/echo/v4/middleware"
@@ -28,7 +28,6 @@ func main() {
 	port := flag.Int("port", 3001, "port of http server")
 	flag.Parse()
 
-	fmt.Printf("the port is %d\n", *port)
 	client, err := consul.NewClient(&consul.Config{
 		Address: ConsulAddress,
 		Scheme:  "http",

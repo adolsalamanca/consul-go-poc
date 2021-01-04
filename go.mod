@@ -1,4 +1,4 @@
-module github.com/adolsalamanca/consul-kv
+module github.com/adolsalamanca/consul-go-poc
 
 go 1.15
 

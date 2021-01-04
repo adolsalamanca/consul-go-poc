@@ -15,15 +15,16 @@ Some of its functionality may sound familiar if you are already using or have he
 </p>
 
 <p>
-Consul enables rapid deployment, configuration, and maintenance of service-oriented architectures at massive scale. For more information, please see:
+Consul enables rapid deployment, configuration, and maintenance of service-oriented architectures at massive scale. For more information, please see references section.
 </p>
 
 ## Requirements
+<p>
+This POC assumes that the user has some tools already installed in its computer:
+</p>
 
-
-
-
-
+* Docker version 19.03.13
+* Go version go1.15.5 darwin/amd64
 
 ## Running the POC
 
@@ -47,12 +48,22 @@ You will see that only of the instances is the leader, it is using consul KV sto
 
 
 
+## Author
+
+* **Adolfo Rodriguez** - *consul-go-poc* - [adolsalamanca](https://github.com/adolsalamanca)
+
+
 ## References
 * [Consul documentation](https://duckduckgo.com)
 * [Consul on Github](https://github.com/hashicorp/consul)
 * [Consul docker images](https://hub.docker.com/_/consul)
 * [Leader election inspiration](https://clivern.com/leader-election-with-consul-and-golang/)
 * [Echo](https://echo.labstack.com/)
+
+
+## License
+
+This project is licensed under the MIT License
 
 
 
