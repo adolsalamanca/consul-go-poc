@@ -10,36 +10,49 @@ All services APIs would be reachable by its hostname but sometimes we have tasks
 ## What is consul?
 
 <p>
-Consul is a distributed, highly-available, and multi-datacenter aware tool for service discovery, configuration, and orchestration. 
+Consul is a distributed, highly-available, and multi-datacenter aware tool for service discovery, configuration, and orchestration.
+Some of its functionality may sound familiar if you are already using or have heard about etcd. 
 </p>
 
 <p>
 Consul enables rapid deployment, configuration, and maintenance of service-oriented architectures at massive scale. For more information, please see:
 </p>
 
+## Requirements
 
-* [Consul documentation](https://duckduckgo.com)
-* [Consul on Github](https://github.com/hashicorp/consul)
+
+
+
 
 
 ## Running the POC
 
-#### How to start consul agents
+First of all, you need to set up your consul cluster, simply run:
 ```
-docker run -d -p 8500:8500 --name=dev-consul -e CONSUL_BIND_INTERFACE=eth0 consul
-docker run -d -e CONSUL_BIND_INTERFACE=eth0 consul agent -dev -join=172.17.0.2
-docker run -d -e CONSUL_BIND_INTERFACE=eth0 consul agent -dev -join=172.17.0.2
+docker-compose -f docker-compose.yml up -d
 ```
+
+After that, you can already try to use the Application, it is only needed to set up two different instances to see the magic.
+Open first terminal and type:
+```
+go run main.go -port=8080
+```
+
+Now open another one:
+```
+go run main.go -port=3001
+```
+
+You will see that only of the instances is the leader, it is using consul KV store to perform this assignment and also to rotate it.
+
+
 
 ## References
-
-*  [Consul docker images](https://hub.docker.com/_/consul)
-*  [Leader election inspiration](https://clivern.com/leader-election-with-consul-and-golang/)
-
-
-## Modules
-* Echo
-* Consul
+* [Consul documentation](https://duckduckgo.com)
+* [Consul on Github](https://github.com/hashicorp/consul)
+* [Consul docker images](https://hub.docker.com/_/consul)
+* [Leader election inspiration](https://clivern.com/leader-election-with-consul-and-golang/)
+* [Echo](https://echo.labstack.com/)
 
 
 
