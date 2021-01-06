@@ -1,13 +1,13 @@
-## Consul used for leader election using Go
+## Leader Election using Hashicorp Consul KV
 
 <p>
 This is a simple probe of concept that uses Consul KV to make leader election between several instances of a service that exposes a simple API.
 </p>
 <p>
-All services APIs would be reachable by its hostname but sometimes we have tasks that would need to be performed by just one of the services, this is why consul is useful here.
+All services APIs would be reachable by its hostname but we would like some of its tasks to be performed by just one of the instances, here is where Consul shines. 
 </p>
 
-## What is consul?
+## What is Consul?
 
 <p>
 Consul is a distributed, highly-available, and multi-datacenter aware tool for service discovery, configuration, and orchestration.
@@ -44,7 +44,8 @@ Now open another one:
 go run main.go -port=3001
 ```
 
-You will see that only of the instances is the leader, it is using consul KV store to perform this assignment and also to rotate it.
+You will see that only of the instances is the leader, it is using consul KV store to perform the assignment and to rotate it.
+You can try to stop the Leader and one of secondary services will take the leadership now.
 
 
 
@@ -54,6 +55,7 @@ You will see that only of the instances is the leader, it is using consul KV sto
 
 
 ## References
+
 * [Consul documentation](https://duckduckgo.com)
 * [Consul on Github](https://github.com/hashicorp/consul)
 * [Consul docker images](https://hub.docker.com/_/consul)
@@ -63,7 +65,7 @@ You will see that only of the instances is the leader, it is using consul KV sto
 
 ## License
 
-This project is licensed under the MIT License
+This project is licensed under MIT License.
 
 
 
