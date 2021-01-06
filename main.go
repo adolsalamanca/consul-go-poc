@@ -21,14 +21,22 @@ const (
 	RenewSessionTime = "5s"
 )
 
+type Clienter interface {
+	Agent() *consul.Agent
+	Session() *consul.Session
+	KV() *consul.KV
+}
+
 func main() {
+	var client Clienter
+	var err error
 	var leader = false
 	isLeader := &leader
 
 	port := flag.Int("port", 3001, "port of http server")
 	flag.Parse()
 
-	client, err := consul.NewClient(&consul.Config{
+	client, err = consul.NewClient(&consul.Config{
 		Address: ConsulAddress,
 		Scheme:  "http",
 	})
@@ -56,7 +64,7 @@ func main() {
 	}
 
 	sessionID, _, err := client.Session().Create(&consul.SessionEntry{
-		Name:     "service/api/leader",
+		Name:     "service/monitoring/leader",
 		Behavior: consul.SessionBehaviorDelete,
 		TTL:      "10s",
 	}, nil)
@@ -65,7 +73,7 @@ func main() {
 	}
 
 	p := &consul.KVPair{
-		Key:     "service/api/leader",
+		Key:     "service/monitoring/leader",
 		Value:   []byte(sessionID),
 		Session: sessionID,
 	}
@@ -78,17 +86,17 @@ func main() {
 	go RenewSession(client, sessionID, doneChan)
 
 	go ListenShutdown(isLeader, client, p)
-	go StartApi(*port)
+	go StartApi(*port, h, 0)
 
 	<-doneChan
 }
 
-func WaitForLeadership(isLeader *bool, client *consul.Client, p *consul.KVPair, h string) {
+func WaitForLeadership(isLeader *bool, client Clienter, p *consul.KVPair, h string) {
 	for {
 		leader, _, err := client.KV().Acquire(p, nil)
 		isLeader = &leader
 		if err != nil {
-			fmt.Errorf("error trying to acquire leadership, %s\n", err)
+			fmt.Printf("error trying to acquire leadership, %s\n", err)
 		}
 
 		if !leader {
@@ -105,26 +113,36 @@ func WaitForLeadership(isLeader *bool, client *consul.Client, p *consul.KVPair, 
 	}
 }
 
-func RenewSession(client *consul.Client, sessionID string, doneChan chan struct{}) {
+func RenewSession(client Clienter, sessionID string, doneChan chan struct{}) {
 	// RenewPeriodic is used to periodically invoke Session until a doneChan is closed.
 	// This is used in a long running goroutine to ensure a session stays valid.
-	client.Session().RenewPeriodic(
+	err := client.Session().RenewPeriodic(
 		RenewSessionTime,
 		sessionID,
 		nil,
 		doneChan,
 	)
+
+	if err != nil {
+		log.Fatalf("could not renew consul session, %s", err)
+	}
+
 }
 
-func StartApi(port int) {
+func StartApi(port int, hostname string, pid int) {
 	e := echo.New()
 	e.Use(middleware.Logger())
-	e.GET("/api", api.MainHandler)
+	e.GET("/api", func(c echo.Context) error {
+		return api.MainHandler(c, hostname, pid)
+	})
 	e.GET("/_health", api.HealthHandler)
-	e.Start(fmt.Sprintf("%s:%d", LocalAddress, port))
+	err := e.Start(fmt.Sprintf("%s:%d", LocalAddress, port))
+	if err != nil {
+		log.Fatalf("could not start API, %s", err)
+	}
 }
 
-func ListenShutdown(isLeader *bool, c *consul.Client, p *consul.KVPair) {
+func ListenShutdown(isLeader *bool, c Clienter, p *consul.KVPair) {
 	s := make(chan os.Signal, 1)
 	signal.Notify(s, syscall.SIGHUP, syscall.SIGINT, syscall.SIGQUIT)
 	sig := <-s
