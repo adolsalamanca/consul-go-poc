@@ -28,10 +28,9 @@ type Clienter interface {
 }
 
 func main() {
+	isLeader := make(chan bool, 500)
 	var client Clienter
 	var err error
-	var leader = false
-	isLeader := &leader
 
 	port := flag.Int("port", 3001, "port of http server")
 	flag.Parse()
@@ -48,11 +47,13 @@ func main() {
 	if err != nil {
 		log.Fatalf("could not retrieve hostname, %s", err)
 	}
+	pid := os.Getpid()
 
+	fmt.Printf("Started client, id: %s-%d\n", h, pid)
 	err = client.Agent().ServiceRegister(&consul.AgentServiceRegistration{
 		Address: fmt.Sprintf("%s:%d", ServiceAddress, *port),
-		ID:      fmt.Sprintf("%s-%d", h, os.Getpid()),
-		Name:    fmt.Sprintf("%s-%d", h, os.Getpid()),
+		ID:      fmt.Sprintf("%s-%d", h, pid),
+		Name:    fmt.Sprintf("%s-%d", h, pid),
 		Tags:    []string{"api"},
 		Check: &consul.AgentServiceCheck{
 			HTTP:     fmt.Sprintf("http://%s:%d/_health", ServiceAddress, *port),
@@ -64,16 +65,17 @@ func main() {
 	}
 
 	sessionID, _, err := client.Session().Create(&consul.SessionEntry{
-		Name:     "service/monitoring/leader",
-		Behavior: consul.SessionBehaviorDelete,
-		TTL:      "10s",
+		Name:      "service/api/leader",
+		Behavior:  consul.SessionBehaviorDelete,
+		TTL:       "10s",
+		LockDelay: 5 * time.Second,
 	}, nil)
 	if err != nil {
 		log.Fatalf("could not create consul session, %s", err)
 	}
 
 	p := &consul.KVPair{
-		Key:     "service/monitoring/leader",
+		Key:     "service/api/leader",
 		Value:   []byte(sessionID),
 		Session: sessionID,
 	}
@@ -82,19 +84,19 @@ func main() {
 	doneChan := make(chan struct{})
 	defer close(doneChan)
 
+	sig := make(chan os.Signal, 1)
+	go ListenShutdown(sig, isLeader, client, p)
 	go WaitForLeadership(isLeader, client, p, h)
 	go RenewSession(client, sessionID, doneChan)
-
-	go ListenShutdown(isLeader, client, p)
-	go StartApi(*port, h, 0)
+	go StartApi(*port, h, pid)
 
 	<-doneChan
 }
 
-func WaitForLeadership(isLeader *bool, client Clienter, p *consul.KVPair, h string) {
+func WaitForLeadership(isLeader chan bool, client Clienter, p *consul.KVPair, h string) {
 	for {
 		leader, _, err := client.KV().Acquire(p, nil)
-		isLeader = &leader
+		isLeader <- leader
 		if err != nil {
 			fmt.Printf("error trying to acquire leadership, %s\n", err)
 		}
@@ -142,19 +144,33 @@ func StartApi(port int, hostname string, pid int) {
 	}
 }
 
-func ListenShutdown(isLeader *bool, c Clienter, p *consul.KVPair) {
-	s := make(chan os.Signal, 1)
-	signal.Notify(s, syscall.SIGHUP, syscall.SIGINT, syscall.SIGQUIT)
-	sig := <-s
+func ListenShutdown(sig chan os.Signal, isLeader chan bool, c Clienter, p *consul.KVPair) {
+	var leader bool
+	var s os.Signal
+	signal.Notify(sig, syscall.SIGHUP, syscall.SIGINT, syscall.SIGQUIT)
 
-	if *isLeader {
-		success, _, err := c.KV().Release(p, nil)
-		if err != nil || !success {
-			log.Printf("could not release session")
-			os.Exit(1)
+	for {
+		select {
+		case s = <-sig:
+			if leader {
+				success, _, err := c.KV().Release(p, nil)
+				log.Printf("About to release leadership from this client \n")
+				if err != nil || !success {
+					log.Printf("could not release session")
+					os.Exit(1)
+				}
+			} else {
+				log.Printf("This client was not leader, so nothing occurs \n")
+			}
+
+			log.Printf("Shutting down system due to %s \n", s)
+			os.Exit(0)
+
+		case leader = <-isLeader:
+		default:
+
 		}
+
 	}
 
-	log.Printf("Shutting down system due to %s", sig)
-	os.Exit(0)
 }
